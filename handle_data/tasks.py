@@ -15,21 +15,22 @@ logger=recorder.get_log().config_log('./logs/response.log')
 
 cli = Client('https://6bc40853ade046ebb83077e956be04d2:d862bee828d848b6882ef875baedfe8c@sentry.cicjust.com//5')
 
+from handle_data.data_mapping import big_dict, gdlx, qylx, nsrlx, cyzw, fplx, szlx, skfws, chiefProvId, chiefCityId, \
+        chiefDistrictId
+
 # 建立redis连接池
 import redis
 from handle_data.celery_config import *
-import hashlib
-import re
-
 redis_pool = redis.ConnectionPool(host=REDIS_HOST, port=REDIS_PORT,db=0, decode_responses=True)
 redis_pool_cfg = redis.ConnectionPool(host=REDIS_HOST, port=REDIS_PORT, db=9,decode_responses=True)
 r = redis.Redis(connection_pool=redis_pool)
 r_cfg = redis.Redis(connection_pool=redis_pool_cfg)
 
 from sqlalchemy import create_engine
-
 egine = create_engine('mysql+pymysql://cic_admin:TaBoq,,1234@192.168.1.170/yct_proxy?charset=utf8')
 
+import hashlib
+import re
 # 建立rpyc连接
 # import rpyc
 # conn = rpyc.connect(rpyc_host,rpyc_port)
@@ -87,149 +88,157 @@ def to_save(data):
 
 
 def Analysis_data(data_str):
-    data_dict = pickle.loads(eval(data_str))
-    request = data_dict.get('request')
-    response = data_dict.get('response')
-    parameters_dict = {}
-    try:
-        request_form = request.urlencoded_form
-        if request_form:
-            for item in request_form.items():
-                parameters_dict[item[0]] = item[1]
-        else:
-            json_data = request.text
-            parameters_dict = json.loads(json_data)
+    data_str = data_str # exec()函数的属性查找，local-->global-->局部-->全局
+    if not r_cfg.get('analysis_data'):
+        res_analysis_data = egine.execute('select analysis_data from yct_config').fetchone()[0]
+        r_cfg.set('analysis_data', res_analysis_data, ex=60 * 10)
+    res_analysis_data = r_cfg.get('analysis_data')
+    exec(res_analysis_data)
 
-    except Exception as e:
-        parameters_dict = {}
-
-    # 公司类型：其他有限责任公司     股东-出资者类型：本市企业
-    # 两次请求，第一次的数据保存在redis，第二次请求从redis中拿，拼接parameters
-    if request.url == 'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/investor/ajax/queryLocalEnty/':
-        try:
-            gdxm = re.findall("etpsName:'(.*?)'", response.text)[0]
-            uniscId = re.findall("uniscId:'(.*?)'", response.text)[0]
-        except Exception as e:
-            return
-        r_cfg.set(uniscId, gdxm, ex=60*60)
-        return
-
-    parameters = handel_parameter(parameters_dict, data_dict.get('to_server'))
-    if not parameters:
-        return
-
-    # 区分不同页面的form
-    page_name = filter_step(data_dict.get('to_server'))
-    if not page_name:
-        return
-
-    time_result = str(request.timestamp_start + request.timestamp_end)
-    product_id = hashlib.md5(time_result.encode(encoding='UTF-8')).hexdigest()  # '8ad9889144f3c6dd2c9763286f163229'
-    analysis_data = {
-        # 'product_id': name,
-        'product_id': product_id,
-        'customer_id': '',
-        'methods': request.method,
-        'web_name': data_dict.get('web_name'),
-        'to_server': data_dict.get('to_server'),
-        'time_circle': data_dict.get('time_circle'),
-        'parameters': parameters,
-        'pageName': page_name,
-        'anync': '',
-        'isSynchronous': '0',
-        'delete_set': False
-    }
-    to_server = data_dict.get('to_server')
-
-    #过滤无用请求
-    # unuse_urls = [
-    #     'http://yct.sh.gov.cn/namedeclare','http://yct.sh.gov.cn/portal_yct',
-    #     'http://yct.sh.gov.cn/favicon.ico',
-    #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/generateCsrfToken',
-    #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/loadAcceptSite',
-    #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/showDescription',
-    #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/establish/edit_yct',
-    #     'http://yct.sh.gov.cn/bizhallnz_yctnew/register',
-    #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/investor/edit',
-    #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/investor/ajax/entity_type',
-    #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/member/to_member_info',
-    #     'http://yct.sh.gov.cn/bizhallnz_yctnew/revert',
-    #     'http://yct.sh.gov.cn/bizhallnz_yctnew/main',
-    #     'http://yct.sh.gov.cn/bizhallnz_yctnew/index'
-    # ]
-    if not r_cfg.get('unuse_urls'):
-        res_unuse_urls = egine.execute('select unuse_urls from yct_config').fetchone()[0]
-        r_cfg.set('unuse_urls', res_unuse_urls, ex=60 * 10)
-    res_unuse_urls = r_cfg.get('unuse_urls')
-    res_unuse_urls = eval(res_unuse_urls)
-    for url in res_unuse_urls:
-        if url in to_server:
-            return
-
-    if not r_cfg.get('page_operate'):
-        res_page_operate = egine.execute('select page_operate from yct_config').fetchone()[0]
-        r_cfg.set('page_operate', res_page_operate, ex=60 * 10)
-    res_page_operate = r_cfg.get('page_operate')
-    exec(res_page_operate)
-
-    # # apply_form的保存，会产生公司名称和yctAppNo
-    # if 'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/save_info' in to_server:
-    #     registerAppNo = parameters_dict.get('registerAppNo', '')
-    #     yctAppNo = parameters_dict.get('yctAppNo', '') or parameters_dict.get('yctSocialUnit.yctAppNo', '')
-    #     etpsName = parameters_dict.get('etpsApp.etpsName', '')
-    #     # 将registerAppNo对应公司名称和yctAppNo对应公司名称，暂存到redis
-    #     r_cfg.mset({registerAppNo: etpsName, yctAppNo: etpsName})
-    #     analysis_data['registerAppNo'] = registerAppNo
-    #     analysis_data['yctAppNo'] = yctAppNo
-    #     analysis_data['etpsName'] = etpsName
-    #     analysis_data['to_server'] = 'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/save_info'
+    # for i in range(1):
+    #     data_dict = pickle.loads(eval(data_str))
+    #     request = data_dict.get('request')
+    #     response = data_dict.get('response')
+    #     parameters_dict = {}
+    #     try:
+    #         request_form = request.urlencoded_form
+    #         if request_form:
+    #             for item in request_form.items():
+    #                 parameters_dict[item[0]] = item[1]
+    #         else:
+    #             json_data = request.text
+    #             parameters_dict = json.loads(json_data)
     #
-    # # 针对股东或成员的保存
-    # elif to_server in ['http://yct.sh.gov.cn/bizhallnz_yctnew/apply/investor/ajax/save',
-    #                    'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/member/ajax_save_member']:
-    #     registerAppNo = parameters_dict.get('appNo') or parameters_dict.get('etpsMember.appNo')  # 注册公司对应的唯一的appNo
-    #     gdNo = response.text  # 股东对应的编号
-    #     analysis_data['customer_id'] = gdNo
-    #     analysis_data['registerAppNo'] = registerAppNo
-    #     if r_cfg.get(registerAppNo):
-    #         analysis_data['etpsName'] = r_cfg.get(registerAppNo).decode(encoding='utf-8') if isinstance(
-    #             r_cfg.get(registerAppNo), bytes) else r_cfg.get(registerAppNo)
-    #         analysis_data['yctAppNo'] = ''  # 股东没有yctAppNo，置为空
+    #     except Exception as e:
+    #         parameters_dict = {}
     #
-    # # 针对股东的删除
-    # elif 'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/investor/ajax/delete' in to_server:
-    #     from urllib import parse
-    #     params = parse.parse_qs(parse.urlparse(to_server).query)
-    #     gdNo = params.get('id', [])[0]
-    #     registerAppNo = params.get('appNo', [])[0]
-    #     analysis_data['customer_id'] = gdNo
-    #     analysis_data['registerAppNo'] = registerAppNo
-    #     analysis_data['delete_set'] = True
+    #     # 公司类型：其他有限责任公司     股东-出资者类型：本市企业
+    #     # 两次请求，第一次的数据保存在redis，第二次请求从redis中拿，拼接parameters
+    #     if request.url == 'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/investor/ajax/queryLocalEnty/':
+    #         try:
+    #             gdxm = re.findall("etpsName:'(.*?)'", response.text)[0]
+    #             uniscId = re.findall("uniscId:'(.*?)'", response.text)[0]
+    #         except Exception as e:
+    #             break
+    #         r_cfg.set(uniscId, gdxm, ex=60*60)
+    #         break
     #
-    # # 针对成员的删除
-    # elif 'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/member/ajax_delete_member' in to_server:
-    #     from urllib import parse
-    #     params = parse.parse_qs(parse.urlparse(to_server).query)
-    #     gdNo = params.get('id', [])[0]
-    #     analysis_data['customer_id'] = gdNo
-    #     analysis_data['delete_set'] = True
+    #     parameters = handel_parameter(parameters_dict, data_dict.get('to_server'))
+    #     if not parameters:
+    #         break
     #
-    # # 针对其他的form的保存，前提是appNo对应apply_form已经存在库里
-    # else:
-    #     yctAppNo = parameters_dict.get('yctAppNo', '') or parameters_dict.get('yctSocialUnit.yctAppNo', '')
-    #     registerAppNo = parameters_dict.get('registerAppNo', '') or parameters_dict.get('appNo') or parameters_dict.get('etpsMember.appNo')
-    #     if yctAppNo or registerAppNo:
-    #         if r_cfg.get(yctAppNo):
-    #             analysis_data['registerAppNo'] = ''
-    #             analysis_data['yctAppNo'] = yctAppNo
-    #             analysis_data['etpsName'] = r_cfg.get(yctAppNo).decode(encoding='utf-8') if isinstance(r_cfg.get(yctAppNo),bytes) else r_cfg.get(yctAppNo)
-    #         elif r_cfg.get(registerAppNo):
-    #             analysis_data['yctAppNo'] = ''
-    #             analysis_data['registerAppNo'] = registerAppNo
+    #     # 区分不同页面的form
+    #     page_name = filter_step(data_dict.get('to_server'))
+    #     if not page_name:
+    #         break
+    #
+    #     to_server = data_dict.get('to_server')
+    #
+    #     #过滤无用请求
+    #     # unuse_urls = [
+    #     #     'http://yct.sh.gov.cn/namedeclare','http://yct.sh.gov.cn/portal_yct',
+    #     #     'http://yct.sh.gov.cn/favicon.ico',
+    #     #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/generateCsrfToken',
+    #     #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/loadAcceptSite',
+    #     #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/showDescription',
+    #     #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/establish/edit_yct',
+    #     #     'http://yct.sh.gov.cn/bizhallnz_yctnew/register',
+    #     #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/investor/edit',
+    #     #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/investor/ajax/entity_type',
+    #     #     'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/member/to_member_info',
+    #     #     'http://yct.sh.gov.cn/bizhallnz_yctnew/revert',
+    #     #     'http://yct.sh.gov.cn/bizhallnz_yctnew/main',
+    #     #     'http://yct.sh.gov.cn/bizhallnz_yctnew/index'
+    #     # ]
+    #     if not r_cfg.get('unuse_urls'):
+    #         res_unuse_urls = egine.execute('select unuse_urls from yct_config').fetchone()[0]
+    #         r_cfg.set('unuse_urls', res_unuse_urls, ex=60 * 30)
+    #     res_unuse_urls = r_cfg.get('unuse_urls')
+    #     res_unuse_urls = eval(res_unuse_urls)
+    #     Tag = True
+    #     for url in res_unuse_urls:
+    #         if url in to_server:
+    #             Tag = False
+    #             break
+    #     if not Tag:
+    #         break
+    #
+    #     time_result = str(request.timestamp_start + request.timestamp_end)
+    #     product_id = hashlib.md5(time_result.encode(encoding='UTF-8')).hexdigest()  # '8ad9889144f3c6dd2c9763286f163229'
+    #     analysis_data = {
+    #         # 'product_id': name,
+    #         'product_id': product_id,
+    #         'customer_id': '',
+    #         'methods': request.method,
+    #         'web_name': data_dict.get('web_name'),
+    #         'to_server': data_dict.get('to_server'),
+    #         'time_circle': data_dict.get('time_circle'),
+    #         'parameters': parameters,
+    #         'pageName': page_name,
+    #         'anync': '',
+    #         'isSynchronous': '0',
+    #         'delete_set': False
+    #     }
+    #
+    #     # apply_form的保存，会产生公司名称和yctAppNo
+    #     if 'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/save_info' in to_server:
+    #         registerAppNo = parameters_dict.get('registerAppNo', '')
+    #         yctAppNo = parameters_dict.get('yctAppNo', '') or parameters_dict.get('yctSocialUnit.yctAppNo', '')
+    #         etpsName = parameters_dict.get('etpsApp.etpsName', '')
+    #         # 将registerAppNo对应公司名称和yctAppNo对应公司名称，暂存到redis
+    #         r_cfg.mset({registerAppNo: etpsName, yctAppNo: etpsName})
+    #         analysis_data['registerAppNo'] = registerAppNo
+    #         analysis_data['yctAppNo'] = yctAppNo
+    #         analysis_data['etpsName'] = etpsName
+    #         analysis_data['to_server'] = 'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/save_info'
+    #
+    #     # 针对股东或成员的保存
+    #     elif to_server in ['http://yct.sh.gov.cn/bizhallnz_yctnew/apply/investor/ajax/save',
+    #                        'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/member/ajax_save_member']:
+    #         registerAppNo = parameters_dict.get('appNo') or parameters_dict.get('etpsMember.appNo')  # 注册公司对应的唯一的appNo
+    #         gdNo = response.text  # 股东对应的编号
+    #         analysis_data['customer_id'] = gdNo
+    #         analysis_data['registerAppNo'] = registerAppNo
+    #         if r_cfg.get(registerAppNo):
     #             analysis_data['etpsName'] = r_cfg.get(registerAppNo).decode(encoding='utf-8') if isinstance(
     #                 r_cfg.get(registerAppNo), bytes) else r_cfg.get(registerAppNo)
-    logger.info('product_id=%s parameters=%s ' % (product_id, json.loads(parameters)))
-    logger.info('product_id=%s analysis_data=%s ' % (product_id, analysis_data))
+    #             analysis_data['yctAppNo'] = ''  # 股东没有yctAppNo，置为空
+    #
+    #     # 针对股东的删除
+    #     elif 'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/investor/ajax/delete' in to_server:
+    #         from urllib import parse
+    #         params = parse.parse_qs(parse.urlparse(to_server).query)
+    #         gdNo = params.get('id', [])[0]
+    #         registerAppNo = params.get('appNo', [])[0]
+    #         analysis_data['customer_id'] = gdNo
+    #         analysis_data['registerAppNo'] = registerAppNo
+    #         analysis_data['delete_set'] = True
+    #
+    #     # 针对成员的删除
+    #     elif 'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/member/ajax_delete_member' in to_server:
+    #         from urllib import parse
+    #         params = parse.parse_qs(parse.urlparse(to_server).query)
+    #         gdNo = params.get('id', [])[0]
+    #         analysis_data['customer_id'] = gdNo
+    #         analysis_data['delete_set'] = True
+    #
+    #     # 针对其他的form的保存，前提是appNo对应apply_form已经存在库里
+    #     else:
+    #         yctAppNo = parameters_dict.get('yctAppNo', '') or parameters_dict.get('yctSocialUnit.yctAppNo', '')
+    #         registerAppNo = parameters_dict.get('registerAppNo', '') or parameters_dict.get('appNo') or parameters_dict.get('etpsMember.appNo')
+    #         if yctAppNo or registerAppNo:
+    #             if r_cfg.get(yctAppNo):
+    #                 analysis_data['registerAppNo'] = ''
+    #                 analysis_data['yctAppNo'] = yctAppNo
+    #                 analysis_data['etpsName'] = r_cfg.get(yctAppNo).decode(encoding='utf-8') if isinstance(r_cfg.get(yctAppNo),bytes) else r_cfg.get(yctAppNo)
+    #             elif r_cfg.get(registerAppNo):
+    #                 analysis_data['yctAppNo'] = ''
+    #                 analysis_data['registerAppNo'] = registerAppNo
+    #                 analysis_data['etpsName'] = r_cfg.get(registerAppNo).decode(encoding='utf-8') if isinstance(
+    #                     r_cfg.get(registerAppNo), bytes) else r_cfg.get(registerAppNo)
+    #     logger.info('product_id=%s parameters=%s ' % (product_id, json.loads(parameters)))
+    #     logger.info('product_id=%s analysis_data=%s ' % (product_id, analysis_data))
+    analysis_data = locals()['analysis_data']
     return analysis_data
 
 
@@ -253,63 +262,73 @@ def Analysis_data(data_str):
 
 def handel_parameter(parameter_dict, url):
     '''拼接参数'''
-    parameters = {}
-    from handle_data.data_mapping import big_dict, gdlx, qylx, nsrlx, cyzw, fplx, szlx, skfws, chiefProvId, chiefCityId, \
-        chiefDistrictId
-    step_name = filter_step(url)
-    if step_name == 'gdform':
-        uniscId = parameter_dict.get('uniscId', '') # 91310110350765847Q 统一社会信用码
-        if uniscId:
-            gdxm = r_cfg.get(uniscId)
-        else:
-            gdxm = parameter_dict.get('personInvtSet', [{}])[0].get('personName', '') or \
-                   parameter_dict.get('etpsOtherSet', [{}])[0].get('name', '') or \
-                   parameter_dict.get('etpsOutlandSet', [{}])[0].get('name', '')  # 姓名
-        parameters.update(
-            # 其他组织
-            # gdxm=parameter_dict.get('etpsOtherSet', [{}])[0].get('name', ''),# 姓名
-            # gddz=parameter_dict.get('address', ''),  # 地址
-            # 外省市企业
-            # gdxm=parameter_dict.get('etpsOutlandSet', [{}])[0].get('name', ''),# 姓名
-            # gddz=parameter_dict.get('address', ''),  # 地址
-            # 本市企业
-            # gdxm=parameter_dict.get('personInvtSet', [{}])[0].get('personName', ''),  # 姓名
-            # gddz=parameter_dict.get('address', ''),  # 地址
-            # 投资自然人
-            gdxm = gdxm,
-            gdsfz=parameter_dict.get('personInvtSet', [{}])[0].get('cetfId', ''), # 身份证
-            gddz=parameter_dict.get('address', ''),  # 地址
-            gdrj=parameter_dict.get('cptl', ''),  # 认缴金额
-            czqx=parameter_dict.get('deadlineDate', ''),  # 出资期限
-            gdlx=gdlx.get(parameter_dict.get('entityTypeId', ''), ''),  # 股东类型
-        )
-    else:
-        maping_dict = big_dict.get(step_name)
-        if maping_dict:
-            for k, v in maping_dict.items():
-                if v == 'qylx':
-                    parameters[v] = qylx.get(parameter_dict.get(k, ''), '')
-                elif v == 'nsrlx':
-                    parameters[v] = nsrlx.get(parameter_dict.get(k, ''), '')
-                elif v == 'cyzw':
-                    parameters[v] = cyzw.get(parameter_dict.get(k, ''), '')
-                elif v == 'fplx':
-                    parameters[v] = fplx.get(parameter_dict.get(k, ''), '')
-                elif v == 'szlx':
-                    parameters[v] = szlx.get(parameter_dict.get(k, ''), '')
-                elif v == 'skfws':
-                    parameters[v] = skfws.get(parameter_dict.get(k, ''), '')
-                elif k == 'frdz':
-                    parameters[k] = chiefProvId.get(parameter_dict.get(v[0], ''), '') \
-                                    + chiefCityId.get(parameter_dict.get(v[1], ''), '') \
-                                    + chiefDistrictId.get(parameter_dict.get(v[2], ''), '')
-                elif k == 'zcdz':
-                    parameters[k] = parameter_dict.get(v, '')
-                else:
-                    parameters[v] = parameter_dict.get(k, '')
-        # else:
-        #     return json.dumps(parameter_dict)
 
+    # exec()函数的属性查找，local-->global-->局部-->全局
+    parameter_dict = parameter_dict
+    url = url
+    if not r_cfg.get('handel_parameter'):
+        res_handel_parameter = egine.execute('select handel_parameter from yct_config').fetchone()[0]
+        r_cfg.set('handel_parameter', res_handel_parameter, ex=60 * 10)
+    res_handel_parameter = r_cfg.get('handel_parameter')
+    exec(res_handel_parameter)
+
+    # parameters = {}
+    # # from handle_data.data_mapping import big_dict, gdlx, qylx, nsrlx, cyzw, fplx, szlx, skfws, chiefProvId, chiefCityId, \
+    # #     chiefDistrictId
+    # step_name = filter_step(url)
+    # if step_name == 'gdform':
+    #     uniscId = parameter_dict.get('uniscId', '') # 91310110350765847Q 统一社会信用码
+    #     if uniscId:
+    #         gdxm = r_cfg.get(uniscId)
+    #     else:
+    #         gdxm = parameter_dict.get('personInvtSet', [{}])[0].get('personName', '') or \
+    #                parameter_dict.get('etpsOtherSet', [{}])[0].get('name', '') or \
+    #                parameter_dict.get('etpsOutlandSet', [{}])[0].get('name', '')  # 姓名
+    #     parameters.update(
+    #         # 其他组织
+    #         # gdxm=parameter_dict.get('etpsOtherSet', [{}])[0].get('name', ''),# 姓名
+    #         # gddz=parameter_dict.get('address', ''),  # 地址
+    #         # 外省市企业
+    #         # gdxm=parameter_dict.get('etpsOutlandSet', [{}])[0].get('name', ''),# 姓名
+    #         # gddz=parameter_dict.get('address', ''),  # 地址
+    #         # 本市企业
+    #         # gdxm=parameter_dict.get('personInvtSet', [{}])[0].get('personName', ''),  # 姓名
+    #         # gddz=parameter_dict.get('address', ''),  # 地址
+    #         # 投资自然人
+    #         gdxm = gdxm,
+    #         gdsfz=parameter_dict.get('personInvtSet', [{}])[0].get('cetfId', ''), # 身份证
+    #         gddz=parameter_dict.get('address', ''),  # 地址
+    #         gdrj=parameter_dict.get('cptl', ''),  # 认缴金额
+    #         czqx=parameter_dict.get('deadlineDate', ''),  # 出资期限
+    #         gdlx=gdlx.get(parameter_dict.get('entityTypeId', ''), ''),  # 股东类型
+    #     )
+    # else:
+    #     maping_dict = big_dict.get(step_name)
+    #     if maping_dict:
+    #         for k, v in maping_dict.items():
+    #             if v == 'qylx':
+    #                 parameters[v] = qylx.get(parameter_dict.get(k, ''), '')
+    #             elif v == 'nsrlx':
+    #                 parameters[v] = nsrlx.get(parameter_dict.get(k, ''), '')
+    #             elif v == 'cyzw':
+    #                 parameters[v] = cyzw.get(parameter_dict.get(k, ''), '')
+    #             elif v == 'fplx':
+    #                 parameters[v] = fplx.get(parameter_dict.get(k, ''), '')
+    #             elif v == 'szlx':
+    #                 parameters[v] = szlx.get(parameter_dict.get(k, ''), '')
+    #             elif v == 'skfws':
+    #                 parameters[v] = skfws.get(parameter_dict.get(k, ''), '')
+    #             elif k == 'frdz':
+    #                 parameters[k] = chiefProvId.get(parameter_dict.get(v[0], ''), '') \
+    #                                 + chiefCityId.get(parameter_dict.get(v[1], ''), '') \
+    #                                 + chiefDistrictId.get(parameter_dict.get(v[2], ''), '')
+    #             elif k == 'zcdz':
+    #                 parameters[k] = parameter_dict.get(v, '')
+    #             else:
+    #                 parameters[v] = parameter_dict.get(k, '')
+    #     # else:
+    #     #     return json.dumps(parameter_dict)
+    parameters = locals()['parameters']
     return json.dumps(parameters)
 
 
