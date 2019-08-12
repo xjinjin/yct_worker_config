@@ -94,6 +94,8 @@ def Analysis_data(data_str):
         r_cfg.set('analysis_data', res_analysis_data, ex=60 * 10)
     res_analysis_data = r_cfg.get('analysis_data')
     exec(res_analysis_data)
+    analysis_data = locals().get('analysis_data','')
+    return analysis_data
 
     # for i in range(1):
     #     data_dict = pickle.loads(eval(data_str))
@@ -238,8 +240,7 @@ def Analysis_data(data_str):
     #                     r_cfg.get(registerAppNo), bytes) else r_cfg.get(registerAppNo)
     #     logger.info('product_id=%s parameters=%s ' % (product_id, json.loads(parameters)))
     #     logger.info('product_id=%s analysis_data=%s ' % (product_id, analysis_data))
-    analysis_data = locals()['analysis_data']
-    return analysis_data
+
 
 
 # form_url_dict = {
@@ -271,6 +272,8 @@ def handel_parameter(parameter_dict, url):
         r_cfg.set('handel_parameter', res_handel_parameter, ex=60 * 10)
     res_handel_parameter = r_cfg.get('handel_parameter')
     exec(res_handel_parameter)
+    parameters = locals().get('parameters','')
+    return json.dumps(parameters)
 
     # parameters = {}
     # # from handle_data.data_mapping import big_dict, gdlx, qylx, nsrlx, cyzw, fplx, szlx, skfws, chiefProvId, chiefCityId, \
@@ -328,8 +331,6 @@ def handel_parameter(parameter_dict, url):
     #                 parameters[v] = parameter_dict.get(k, '')
     #     # else:
     #     #     return json.dumps(parameter_dict)
-    parameters = locals()['parameters']
-    return json.dumps(parameters)
 
 
 def filter_step(to_server):
