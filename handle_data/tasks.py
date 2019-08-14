@@ -27,8 +27,8 @@ r = redis.Redis(connection_pool=redis_pool)
 r_cfg = redis.Redis(connection_pool=redis_pool_cfg)
 
 import pymysql
-from sqlalchemy import create_engine
-egine = create_engine('mysql+pymysql://cic_admin:TaBoq,,1234@192.168.1.170/yct_proxy?charset=utf8')
+# from sqlalchemy import create_engine
+# egine = create_engine('mysql+pymysql://cic_admin:TaBoq,,1234@192.168.1.170/yct_proxy?charset=utf8')
 
 import hashlib
 import re
@@ -92,8 +92,8 @@ def Analysis_data(data_str):
     data_str = data_str # exec()函数的属性查找，local-->global-->局部-->全局
     if not r_cfg.get('analysis_data'):
         # res_analysis_data = egine.execute('select analysis_data from yct_config').fetchone()[0]
-        conn = pymysql.connect(host='192.168.1.170', user='cic_admin', password='TaBoq,,1234', database='yct_proxy',
-                               charset='utf8')
+        conn = pymysql.connect(host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, database=MYSQL_DATABASE,
+                                   charset=MYSQL_CHARSET)
         cursor = conn.cursor()
         sql = 'select analysis_data from yct_config'
         cursor.execute(sql)
@@ -129,7 +129,7 @@ def Analysis_data(data_str):
     #             uniscId = re.findall("uniscId:'(.*?)'", response.text)[0]
     #         except Exception as e:
     #             break
-    #         r_cfg.set(uniscId, gdxm, ex=60*60)
+    #         r_cfg.set(uniscId, gdxm, ex=60 * 60)
     #         break
     #
     #     parameters = handel_parameter(parameters_dict, data_dict.get('to_server'))
@@ -143,7 +143,7 @@ def Analysis_data(data_str):
     #
     #     to_server = data_dict.get('to_server')
     #
-    #     #过滤无用请求
+    #     # 过滤无用请求
     #     # unuse_urls = [
     #     #     'http://yct.sh.gov.cn/namedeclare','http://yct.sh.gov.cn/portal_yct',
     #     #     'http://yct.sh.gov.cn/favicon.ico',
@@ -161,8 +161,8 @@ def Analysis_data(data_str):
     #     # ]
     #     if not r_cfg.get('unuse_urls'):
     #         # res_unuse_urls = egine.execute('select unuse_urls from yct_config').fetchone()[0]
-    #         conn = pymysql.connect(host='192.168.1.170', user='cic_admin', password='TaBoq,,1234', database='yct_proxy',
-    #                                charset='utf8')
+    #         conn = pymysql.connect(host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, database=MYSQL_DATABASE,
+    #                                charset=MYSQL_CHARSET)
     #         cursor = conn.cursor()
     #         sql = 'select unuse_urls from yct_config'
     #         cursor.execute(sql)
@@ -242,12 +242,14 @@ def Analysis_data(data_str):
     #     # 针对其他的form的保存，前提是appNo对应apply_form已经存在库里
     #     else:
     #         yctAppNo = parameters_dict.get('yctAppNo', '') or parameters_dict.get('yctSocialUnit.yctAppNo', '')
-    #         registerAppNo = parameters_dict.get('registerAppNo', '') or parameters_dict.get('appNo') or parameters_dict.get('etpsMember.appNo')
+    #         registerAppNo = parameters_dict.get('registerAppNo', '') or parameters_dict.get(
+    #             'appNo') or parameters_dict.get('etpsMember.appNo')
     #         if yctAppNo or registerAppNo:
     #             if r_cfg.get(yctAppNo):
     #                 analysis_data['registerAppNo'] = ''
     #                 analysis_data['yctAppNo'] = yctAppNo
-    #                 analysis_data['etpsName'] = r_cfg.get(yctAppNo).decode(encoding='utf-8') if isinstance(r_cfg.get(yctAppNo),bytes) else r_cfg.get(yctAppNo)
+    #                 analysis_data['etpsName'] = r_cfg.get(yctAppNo).decode(encoding='utf-8') if isinstance(
+    #                     r_cfg.get(yctAppNo), bytes) else r_cfg.get(yctAppNo)
     #             elif r_cfg.get(registerAppNo):
     #                 analysis_data['yctAppNo'] = ''
     #                 analysis_data['registerAppNo'] = registerAppNo
@@ -255,7 +257,7 @@ def Analysis_data(data_str):
     #                     r_cfg.get(registerAppNo), bytes) else r_cfg.get(registerAppNo)
     #     logger.info('product_id=%s parameters=%s ' % (product_id, json.loads(parameters)))
     #     logger.info('product_id=%s analysis_data=%s ' % (product_id, analysis_data))
-    #     #analysis_data_cfg = locals().get('analysis_data', '')
+    #     # analysis_data_cfg = locals().get('analysis_data', '')
     #     analysis_data_cfg = analysis_data
 
     analysis_data = locals().get('analysis_data_cfg', '')
@@ -289,8 +291,8 @@ def handel_parameter(parameter_dict, url):
     url = url
     if not r_cfg.get('handel_parameter'):
         # res_handel_parameter = egine.execute('select handel_parameter from yct_config').fetchone()[0]
-        conn = pymysql.connect(host='192.168.1.170', user='cic_admin', password='TaBoq,,1234', database='yct_proxy',
-                               charset='utf8')
+        conn = pymysql.connect(host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, database=MYSQL_DATABASE,
+                                   charset=MYSQL_CHARSET)
         cursor = conn.cursor()
         sql = 'select handel_parameter from yct_config'
         cursor.execute(sql)
@@ -306,7 +308,7 @@ def handel_parameter(parameter_dict, url):
     #     chiefDistrictId
     # step_name = filter_step(url)
     # if step_name == 'gdform':
-    #     uniscId = parameter_dict.get('uniscId', '') # 91310110350765847Q 统一社会信用码
+    #     uniscId = parameter_dict.get('uniscId', '')  # 91310110350765847Q 统一社会信用码
     #     if uniscId:
     #         gdxm = r_cfg.get(uniscId)
     #     else:
@@ -324,8 +326,8 @@ def handel_parameter(parameter_dict, url):
     #         # gdxm=parameter_dict.get('personInvtSet', [{}])[0].get('personName', ''),  # 姓名
     #         # gddz=parameter_dict.get('address', ''),  # 地址
     #         # 投资自然人
-    #         gdxm = gdxm,
-    #         gdsfz=parameter_dict.get('personInvtSet', [{}])[0].get('cetfId', ''), # 身份证
+    #         gdxm=gdxm,
+    #         gdsfz=parameter_dict.get('personInvtSet', [{}])[0].get('cetfId', ''),  # 身份证
     #         gddz=parameter_dict.get('address', ''),  # 地址
     #         gdrj=parameter_dict.get('cptl', ''),  # 认缴金额
     #         czqx=parameter_dict.get('deadlineDate', ''),  # 出资期限
@@ -355,8 +357,8 @@ def handel_parameter(parameter_dict, url):
     #                 parameters[k] = parameter_dict.get(v, '')
     #             else:
     #                 parameters[v] = parameter_dict.get(k, '')
-    #     # else:
-    #     #     return json.dumps(parameter_dict)
+    # # else:
+    # #     return json.dumps(parameter_dict)
     # parameters_cfg = parameters
 
     parameters = locals().get('parameters_cfg', '')
@@ -369,8 +371,8 @@ def filter_step(to_server):
     pageName = ''
     if not r_cfg.get('form_url_dict'):
         # res_form_url_dict = egine.execute('select form_url_dict from yct_config').fetchone()[0]
-        conn = pymysql.connect(host='192.168.1.170', user='cic_admin', password='TaBoq,,1234', database='yct_proxy',
-                               charset='utf8')
+        conn = pymysql.connect(host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, database=MYSQL_DATABASE,
+                                   charset=MYSQL_CHARSET)
         cursor = conn.cursor()
         sql = 'select form_url_dict from yct_config'
         cursor.execute(sql)

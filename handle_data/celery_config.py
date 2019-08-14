@@ -31,6 +31,14 @@ REDIS_HOST = 'aliyun_redis'
 # REDIS_HOST = '127.0.0.1'
 REDIS_PORT = 6379
 
+
+# host='192.168.1.170', user='cic_admin', password='TaBoq,,1234', database='yct_proxy',charset='utf8'
+MYSQL_HOST = '192.168.1.230'
+MYSQL_USER = 'root'
+MYSQL_PASSWORD = 'TaBoq,,1234'
+MYSQL_DATABASE = 'yct_proxy'
+MYSQL_CHARSET = 'utf8'
+
 # RABBITMQ_HOST = '127.0.0.1'
 RABBITMQ_HOST = '47.102.218.137'
 RABBITMQ_PORT = 5672
