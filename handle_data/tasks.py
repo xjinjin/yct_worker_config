@@ -26,6 +26,7 @@ redis_pool_cfg = redis.ConnectionPool(host=REDIS_HOST, port=REDIS_PORT, db=9,dec
 r = redis.Redis(connection_pool=redis_pool)
 r_cfg = redis.Redis(connection_pool=redis_pool_cfg)
 
+import pymysql
 from sqlalchemy import create_engine
 egine = create_engine('mysql+pymysql://cic_admin:TaBoq,,1234@192.168.1.170/yct_proxy?charset=utf8')
 
@@ -90,12 +91,18 @@ def to_save(data):
 def Analysis_data(data_str):
     data_str = data_str # exec()函数的属性查找，local-->global-->局部-->全局
     if not r_cfg.get('analysis_data'):
-        res_analysis_data = egine.execute('select analysis_data from yct_config').fetchone()[0]
-        r_cfg.set('analysis_data', res_analysis_data, ex=60 * 10)
+        # res_analysis_data = egine.execute('select analysis_data from yct_config').fetchone()[0]
+        conn = pymysql.connect(host='192.168.1.170', user='cic_admin', password='TaBoq,,1234', database='yct_proxy',
+                               charset='utf8')
+        cursor = conn.cursor()
+        sql = 'select analysis_data from yct_config'
+        cursor.execute(sql)
+        res_analysis_data = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        r_cfg.set('analysis_data', res_analysis_data, ex=60 * 30)
     res_analysis_data = r_cfg.get('analysis_data')
     exec(res_analysis_data)
-    analysis_data = locals().get('analysis_data','')
-    return analysis_data
 
     # for i in range(1):
     #     data_dict = pickle.loads(eval(data_str))
@@ -153,7 +160,15 @@ def Analysis_data(data_str):
     #     #     'http://yct.sh.gov.cn/bizhallnz_yctnew/index'
     #     # ]
     #     if not r_cfg.get('unuse_urls'):
-    #         res_unuse_urls = egine.execute('select unuse_urls from yct_config').fetchone()[0]
+    #         # res_unuse_urls = egine.execute('select unuse_urls from yct_config').fetchone()[0]
+    #         conn = pymysql.connect(host='192.168.1.170', user='cic_admin', password='TaBoq,,1234', database='yct_proxy',
+    #                                charset='utf8')
+    #         cursor = conn.cursor()
+    #         sql = 'select unuse_urls from yct_config'
+    #         cursor.execute(sql)
+    #         res_unuse_urls = cursor.fetchone()[0]
+    #         cursor.close()
+    #         conn.close()
     #         r_cfg.set('unuse_urls', res_unuse_urls, ex=60 * 30)
     #     res_unuse_urls = r_cfg.get('unuse_urls')
     #     res_unuse_urls = eval(res_unuse_urls)
@@ -240,6 +255,11 @@ def Analysis_data(data_str):
     #                     r_cfg.get(registerAppNo), bytes) else r_cfg.get(registerAppNo)
     #     logger.info('product_id=%s parameters=%s ' % (product_id, json.loads(parameters)))
     #     logger.info('product_id=%s analysis_data=%s ' % (product_id, analysis_data))
+    #     #analysis_data_cfg = locals().get('analysis_data', '')
+    #     analysis_data_cfg = analysis_data
+
+    analysis_data = locals().get('analysis_data_cfg', '')
+    return analysis_data
 
 
 
@@ -268,16 +288,22 @@ def handel_parameter(parameter_dict, url):
     parameter_dict = parameter_dict
     url = url
     if not r_cfg.get('handel_parameter'):
-        res_handel_parameter = egine.execute('select handel_parameter from yct_config').fetchone()[0]
-        r_cfg.set('handel_parameter', res_handel_parameter, ex=60 * 10)
+        # res_handel_parameter = egine.execute('select handel_parameter from yct_config').fetchone()[0]
+        conn = pymysql.connect(host='192.168.1.170', user='cic_admin', password='TaBoq,,1234', database='yct_proxy',
+                               charset='utf8')
+        cursor = conn.cursor()
+        sql = 'select handel_parameter from yct_config'
+        cursor.execute(sql)
+        res_handel_parameter = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        r_cfg.set('handel_parameter', res_handel_parameter, ex=60 * 30)
     res_handel_parameter = r_cfg.get('handel_parameter')
     exec(res_handel_parameter)
-    parameters = locals().get('parameters','')
-    return json.dumps(parameters)
 
     # parameters = {}
-    # # from handle_data.data_mapping import big_dict, gdlx, qylx, nsrlx, cyzw, fplx, szlx, skfws, chiefProvId, chiefCityId, \
-    # #     chiefDistrictId
+    # from handle_data.data_mapping import big_dict, gdlx, qylx, nsrlx, cyzw, fplx, szlx, skfws, chiefProvId, chiefCityId, \
+    #     chiefDistrictId
     # step_name = filter_step(url)
     # if step_name == 'gdform':
     #     uniscId = parameter_dict.get('uniscId', '') # 91310110350765847Q 统一社会信用码
@@ -331,6 +357,10 @@ def handel_parameter(parameter_dict, url):
     #                 parameters[v] = parameter_dict.get(k, '')
     #     # else:
     #     #     return json.dumps(parameter_dict)
+    # parameters_cfg = parameters
+
+    parameters = locals().get('parameters_cfg', '')
+    return json.dumps(parameters)
 
 
 def filter_step(to_server):
@@ -338,8 +368,16 @@ def filter_step(to_server):
         return
     pageName = ''
     if not r_cfg.get('form_url_dict'):
-        res_form_url_dict = egine.execute('select form_url_dict from yct_config').fetchone()[0]
-        r_cfg.set('form_url_dict', res_form_url_dict, ex=60 * 10)
+        # res_form_url_dict = egine.execute('select form_url_dict from yct_config').fetchone()[0]
+        conn = pymysql.connect(host='192.168.1.170', user='cic_admin', password='TaBoq,,1234', database='yct_proxy',
+                               charset='utf8')
+        cursor = conn.cursor()
+        sql = 'select form_url_dict from yct_config'
+        cursor.execute(sql)
+        res_form_url_dict = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        r_cfg.set('form_url_dict', res_form_url_dict, ex=60 * 30)
     res_form_url_dict = r_cfg.get('form_url_dict')
     res_form_url_dict = eval(res_form_url_dict) # {}
     for url, form_name in res_form_url_dict.items():
