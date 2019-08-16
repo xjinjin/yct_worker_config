@@ -34,6 +34,7 @@ REDIS_PORT = 6379
 
 # host='192.168.1.170', user='cic_admin', password='TaBoq,,1234', database='yct_proxy',charset='utf8'
 MYSQL_HOST = '192.168.1.230'
+# MYSQL_HOST = 'yct_mysql'
 MYSQL_USER = 'root'
 MYSQL_PASSWORD = 'TaBoq,,1234'
 MYSQL_DATABASE = 'yct_proxy'
