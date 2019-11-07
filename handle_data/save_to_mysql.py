@@ -25,7 +25,8 @@ class Save_to_sql():
         self._sentry = sentry
 
         # 连接对应的表
-        self.table = db.entity(table_name)
+        self.db = sqlsoup.SQLSoup(SURL, session=Session)
+        self.table = self.db.entity(table_name)
 
     # 插入一条新的原始记录
     def insert_new(self, infodata):
@@ -42,6 +43,7 @@ class Save_to_sql():
         if 'http://yct.sh.gov.cn/bizhallnz_yctnew/search' in to_server:  # 查询数据的不存库
             return
         #保持数据库连接且中断尝试
+        try_count = 0
         while True:
             try:
                 if self.table.filter_by(to_server=to_server, methods=methods, registerAppNo=registerAppNo,
@@ -55,29 +57,37 @@ class Save_to_sql():
                         self.table.filter_by(registerAppNo=registerAppNo).update(upinfo)
                         yctAppNo = infodata.get('yctAppNo')
                         self.table.filter_by(yctAppNo=yctAppNo).update(upinfo)
-                    db.commit()
+                    self.db.commit()
                     return
                 else:
                     break
-            except pymysql.OperationalError as e:
-                db.rollback()
-                self.table = db.entity('yctformdata')
-                continue
+            # # except pymysql.OperationalError as e:
+            # except pymysql.err.OperationalError as e:
+            #     try_count += 1
+            #     if try_count == 3:
+            #         return
+            #     self.db.rollback()
+            #     self.table = self.db.entity('yctformdata')
             except Exception as e:
+                try_count += 1
+                if try_count == 3:
+                    return
                 if self._sentry:
                     self._sentry.captureException()
-                db.rollback()
-                return
+                self.db.rollback()
+                self.table = self.db.entity('yctformdata')
+
+
 
         # 不存在就，直接插入一条新纪录
         new_dict.update(infodata)
         try:
             self.table.insert(**new_dict)
-            db.commit()
+            self.db.commit()
         except Exception as e:
             if self._sentry:
                 self._sentry.captureException()
-            db.rollback()
+            self.db.rollback()
             raise e
 
         if to_server != 'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/save_info':
@@ -87,11 +97,11 @@ class Save_to_sql():
                 if self.table.filter_by(to_server=URL, pageName='apply_form', registerAppNo=registerAppNo).count():
                     self.table.filter_by(to_server=URL, pageName='apply_form', registerAppNo=registerAppNo).update(
                         {'isSynchronous': '0'})
-                    db.commit()
+                    self.db.commit()
             except Exception as e:
                 if self._sentry:
                     self._sentry.captureException()
-                db.rollback()
+                self.db.rollback()
                 raise e
 
         if to_server == 'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/save_info':
@@ -104,11 +114,11 @@ class Save_to_sql():
                     update_info)
                 self.table.filter_by(to_server=member_url, registerAppNo=registerAppNo, pageName='memberform').update(
                     update_info)
-                db.commit()
+                self.db.commit()
             except Exception as e:
                 if self._sentry:
                     self._sentry.captureException()
-                db.rollback()
+                self.db.rollback()
         return
 
     def del_set(self, infodata):
@@ -130,12 +140,12 @@ class Save_to_sql():
             elif 'http://yct.sh.gov.cn/bizhallnz_yctnew/apply/member/ajax_delete_member' in to_server:
                 # 删除成员的请求里没有AppNo，根据customer_id进行筛选
                 the_set = self.table.filter_by(pageName=pageName, customer_id=customer_id).one()
-            db.delete(the_set)
-            db.commit()
+            self.db.delete(the_set)
+            self.db.commit()
         except Exception as e:
             if self._sentry:
                 self._sentry.captureException()
-            db.rollback()
+            self.db.rollback()
 
     def find_data(self, product_id):
         product_data = self.table.filter_by(id=product_id).one()
